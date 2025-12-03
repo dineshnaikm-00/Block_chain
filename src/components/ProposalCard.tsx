@@ -67,15 +67,22 @@ export function ProposalCard({ proposal, onVote, onExecute, userAddress }: Propo
           <p className="text-slate-600 text-sm mb-3">{proposal.description}</p>
           <div className="flex items-center gap-4 text-xs text-slate-500">
             <span className="font-mono">By {proposal.proposer.slice(0, 6)}...{proposal.proposer.slice(-4)}</span>
-            <a 
-              href={proposal.contentUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-            >
-              <ExternalLink className="w-3 h-3" />
-              View Content
-            </a>
+            {proposal.contentUrl && proposal.contentUrl !== 'null' && proposal.contentUrl.trim() !== '' ? (
+              <a 
+                href={proposal.contentUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                View Content
+              </a>
+            ) : (
+              <span className="flex items-center gap-1 text-slate-400">
+                <ExternalLink className="w-3 h-3" />
+                No URL provided
+              </span>
+            )}
           </div>
         </div>
       </div>

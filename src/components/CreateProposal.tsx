@@ -25,7 +25,11 @@ export function CreateProposal({ user, onCreateProposal }: CreateProposalProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !description || !contentUrl) {
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
+    const trimmedContentUrl = contentUrl.trim();
+    
+    if (!trimmedTitle || !trimmedDescription || !trimmedContentUrl) {
       return;
     }
 
@@ -35,7 +39,7 @@ export function CreateProposal({ user, onCreateProposal }: CreateProposalProps) 
 
     try {
       // This will trigger MetaMask popup for user to confirm/sign
-      const result = await createProposalTx(title, description, contentUrl, contentType);
+      const result = await createProposalTx(trimmedTitle, trimmedDescription, trimmedContentUrl, contentType);
       
       if (result.success) {
         setTxStatus('success');
@@ -43,9 +47,9 @@ export function CreateProposal({ user, onCreateProposal }: CreateProposalProps) 
         // Process the proposal creation after successful signature
         setTimeout(() => {
           onCreateProposal({
-            title,
-            description,
-            contentUrl,
+            title: trimmedTitle,
+            description: trimmedDescription,
+            contentUrl: trimmedContentUrl,
             contentType,
             proposer: user.address,
           });
