@@ -119,7 +119,7 @@ export function ProposalCard({ proposal, onVote, onExecute, userAddress }: Propo
 
       {/* Time Remaining & Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-        {proposal.status === 'active' && (
+        {proposal.status === 'active' && timeRemaining > 0 && (
           <>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <Clock className="w-4 h-4" />
@@ -146,6 +146,50 @@ export function ProposalCard({ proposal, onVote, onExecute, userAddress }: Propo
                 Vote Now
               </Button>
             )}
+          </>
+        )}
+        {/* Show Execute button when voting period has ended (time expired) */}
+        {proposal.status === 'active' && timeRemaining <= 0 && (
+          <>
+            <div className="flex flex-col">
+              <span className="text-amber-600 text-sm font-medium">Voting period ended</span>
+              <span className="text-slate-500 text-xs">Ready for execution</span>
+              {executeError && (
+                <span className="text-red-500 text-xs">{executeError}</span>
+              )}
+            </div>
+            <Button 
+              onClick={async () => {
+                setIsExecuting(true);
+                setExecuteError(null);
+                try {
+                  const result = await executeProposalTx(proposal.id);
+                  if (result.success) {
+                    onExecute();
+                  } else {
+                    setExecuteError(result.error || 'Execution failed');
+                  }
+                } catch (error: any) {
+                  setExecuteError(error.message || 'Execution failed');
+                } finally {
+                  setIsExecuting(false);
+                }
+              }} 
+              disabled={isExecuting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Confirming...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="w-4 h-4 mr-2" />
+                  Execute
+                </>
+              )}
+            </Button>
           </>
         )}
         {proposal.status === 'passed' && (
