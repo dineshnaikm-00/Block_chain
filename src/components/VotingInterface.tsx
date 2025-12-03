@@ -4,7 +4,8 @@ import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Badge } from './ui/badge';
-import { CheckCircle2, XCircle, Info, TrendingUp } from 'lucide-react';
+import { CheckCircle2, XCircle, Info, TrendingUp, Loader2 } from 'lucide-react';
+import { voteOnProposal } from '../utils/web3';
 
 interface VotingInterfaceProps {
   proposal: Proposal;
@@ -16,6 +17,9 @@ interface VotingInterfaceProps {
 export function VotingInterface({ proposal, user, onClose, onVote }: VotingInterfaceProps) {
   const [voteAmount, setVoteAmount] = useState(1);
   const [support, setSupport] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [txStatus, setTxStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [txError, setTxError] = useState<string | null>(null);
 
   // Quadratic voting: cost = votes^2
   const calculateCost = (votes: number) => {
@@ -31,10 +35,34 @@ export function VotingInterface({ proposal, user, onClose, onVote }: VotingInter
   const effectiveVotes = getEffectiveVotes(voteAmount);
   const canAfford = cost <= user.tokenBalance;
 
-  const handleVote = () => {
+  const handleVote = async () => {
     if (!canAfford) return;
-    onVote(proposal.id, effectiveVotes, support, cost);
-    onClose();
+    
+    setIsProcessing(true);
+    setTxStatus('pending');
+    setTxError(null);
+
+    try {
+      // This will trigger MetaMask popup for user to confirm/sign
+      const result = await voteOnProposal(proposal.id, effectiveVotes, support, cost);
+      
+      if (result.success) {
+        setTxStatus('success');
+        // Wait a moment to show success state, then process the vote
+        setTimeout(() => {
+          onVote(proposal.id, effectiveVotes, support, cost);
+          onClose();
+        }, 1500);
+      } else {
+        setTxStatus('error');
+        setTxError(result.error || 'Transaction failed');
+        setIsProcessing(false);
+      }
+    } catch (error: any) {
+      setTxStatus('error');
+      setTxError(error.message || 'Transaction failed');
+      setIsProcessing(false);
+    }
   };
 
   const hasVoted = proposal.voters.some(v => v.address === user.address);
@@ -165,25 +193,60 @@ export function VotingInterface({ proposal, user, onClose, onVote }: VotingInter
               </div>
             )}
 
+            {txStatus === 'pending' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                <div>
+                  <p className="text-blue-700 text-sm font-medium">Waiting for MetaMask confirmation...</p>
+                  <p className="text-blue-600 text-xs">Please confirm the transaction in your wallet</p>
+                </div>
+              </div>
+            )}
+
+            {txStatus === 'success' && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <p className="text-emerald-700 text-sm font-medium">Vote confirmed!</p>
+                  <p className="text-emerald-600 text-xs">Your vote has been recorded on the blockchain</p>
+                </div>
+              </div>
+            )}
+
+            {txStatus === 'error' && txError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-red-700 text-sm font-medium">Transaction Failed</p>
+                <p className="text-red-600 text-xs">{txError}</p>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={onClose}
                 variant="outline"
                 className="flex-1 border-slate-300 hover:bg-slate-50 text-slate-700"
+                disabled={isProcessing}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleVote}
-                disabled={!canAfford}
+                disabled={!canAfford || isProcessing}
                 className={`flex-1 text-white shadow-sm ${
                   support
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {support ? 'Vote For' : 'Vote Against'}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  support ? 'Vote For' : 'Vote Against'
+                )}
               </Button>
             </div>
           </div>

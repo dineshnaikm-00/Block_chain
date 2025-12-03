@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Proposal } from '../App';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { CheckCircle2, XCircle, Clock, ExternalLink, PlayCircle, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, ExternalLink, PlayCircle, Check, Loader2 } from 'lucide-react';
+import { executeProposalTx } from '../utils/web3';
 
 interface ProposalCardProps {
   proposal: Proposal;
@@ -11,6 +13,9 @@ interface ProposalCardProps {
 }
 
 export function ProposalCard({ proposal, onVote, onExecute, userAddress }: ProposalCardProps) {
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeError, setExecuteError] = useState<string | null>(null);
+  
   const totalVotes = proposal.votesFor + proposal.votesAgainst;
   const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 0;
   const againstPercentage = totalVotes > 0 ? (proposal.votesAgainst / totalVotes) * 100 : 0;
@@ -138,10 +143,43 @@ export function ProposalCard({ proposal, onVote, onExecute, userAddress }: Propo
         )}
         {proposal.status === 'passed' && (
           <>
-            <span className="text-emerald-600 text-sm">Ready for execution</span>
-            <Button onClick={onExecute} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
-              <PlayCircle className="w-4 h-4 mr-2" />
-              Execute
+            <div className="flex flex-col">
+              <span className="text-emerald-600 text-sm">Ready for execution</span>
+              {executeError && (
+                <span className="text-red-500 text-xs">{executeError}</span>
+              )}
+            </div>
+            <Button 
+              onClick={async () => {
+                setIsExecuting(true);
+                setExecuteError(null);
+                try {
+                  const result = await executeProposalTx(proposal.id);
+                  if (result.success) {
+                    onExecute();
+                  } else {
+                    setExecuteError(result.error || 'Execution failed');
+                  }
+                } catch (error: any) {
+                  setExecuteError(error.message || 'Execution failed');
+                } finally {
+                  setIsExecuting(false);
+                }
+              }} 
+              disabled={isExecuting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Confirming...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="w-4 h-4 mr-2" />
+                  Execute
+                </>
+              )}
             </Button>
           </>
         )}

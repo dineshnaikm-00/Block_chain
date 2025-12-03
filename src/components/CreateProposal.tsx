@@ -5,7 +5,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, Loader2 } from 'lucide-react';
+import { createProposalTx } from '../utils/web3';
 
 interface CreateProposalProps {
   user: User;
@@ -17,27 +18,56 @@ export function CreateProposal({ user, onCreateProposal }: CreateProposalProps) 
   const [description, setDescription] = useState('');
   const [contentUrl, setContentUrl] = useState('');
   const [contentType, setContentType] = useState<'approve' | 'remove'>('remove');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [txStatus, setTxStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [txError, setTxError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title || !description || !contentUrl) {
       return;
     }
 
-    onCreateProposal({
-      title,
-      description,
-      contentUrl,
-      contentType,
-      proposer: user.address,
-    });
+    setIsProcessing(true);
+    setTxStatus('pending');
+    setTxError(null);
 
-    // Reset form
-    setTitle('');
-    setDescription('');
-    setContentUrl('');
-    setContentType('remove');
+    try {
+      // This will trigger MetaMask popup for user to confirm/sign
+      const result = await createProposalTx(title, description, contentUrl, contentType);
+      
+      if (result.success) {
+        setTxStatus('success');
+        
+        // Process the proposal creation after successful signature
+        setTimeout(() => {
+          onCreateProposal({
+            title,
+            description,
+            contentUrl,
+            contentType,
+            proposer: user.address,
+          });
+
+          // Reset form
+          setTitle('');
+          setDescription('');
+          setContentUrl('');
+          setContentType('remove');
+          setTxStatus('idle');
+          setIsProcessing(false);
+        }, 1500);
+      } else {
+        setTxStatus('error');
+        setTxError(result.error || 'Transaction failed');
+        setIsProcessing(false);
+      }
+    } catch (error: any) {
+      setTxStatus('error');
+      setTxError(error.message || 'Transaction failed');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -150,12 +180,46 @@ export function CreateProposal({ user, onCreateProposal }: CreateProposalProps) 
           </ul>
         </div>
 
+        {txStatus === 'pending' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            <div>
+              <p className="text-blue-700 text-sm font-medium">Waiting for MetaMask confirmation...</p>
+              <p className="text-blue-600 text-xs">Please confirm the transaction in your wallet</p>
+            </div>
+          </div>
+        )}
+
+        {txStatus === 'success' && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <div>
+              <p className="text-emerald-700 text-sm font-medium">Proposal created successfully!</p>
+              <p className="text-emerald-600 text-xs">Your proposal has been submitted to the blockchain</p>
+            </div>
+          </div>
+        )}
+
+        {txStatus === 'error' && txError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-red-700 text-sm font-medium">Transaction Failed</p>
+            <p className="text-red-600 text-xs">{txError}</p>
+          </div>
+        )}
+
         <Button 
           type="submit" 
           className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-          disabled={!title || !description || !contentUrl}
+          disabled={!title || !description || !contentUrl || isProcessing}
         >
-          Submit Proposal
+          {isProcessing ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            'Submit Proposal'
+          )}
         </Button>
       </form>
     </div>
